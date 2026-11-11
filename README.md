@@ -20,7 +20,7 @@ No cloud. No accounts. No servers. Your passwords are encrypted and stay on your
 
 ## Download & install (Windows)
 
-1. Go to the [**Releases**](../../releases) page and download one of:
+1. Go to the [**Releases**](https://github.com/zion07740/sentrix/releases) page and download one of:
    - `Sentrix-Setup-x.y.z.exe`: installer (recommended)
    - `Sentrix-x.y.z-portable.exe`: a single file you can run without installing
 2. Run it. Windows will probably show **"Windows protected your PC"**, because the app isn't code-signed (signing certificates cost money). Click **More info → Run anyway**.
@@ -88,7 +88,7 @@ Full details and the threat model are in [SECURITY.md](SECURITY.md).
 Requirements: Windows 10/11, [Node.js](https://nodejs.org) 22 or newer, Git.
 
 ```bash
-git clone https://github.com/<you>/sentrix.git
+git clone https://github.com/zion07740/sentrix.git
 ```
 
 ```bash
