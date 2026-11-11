@@ -24,6 +24,12 @@ describe('urlMatches', () => {
     ['http://192.168.1.1', 'http://192.168.1.2/', false],
     ['http://localhost:3000', 'http://localhost:3000/login', true],
     ['http://localhost:3000', 'http://localhost:4000/login', false],
+    // saved without a scheme: public sites count as https, local addresses may be http
+    ['bank.com', 'http://bank.com/', false],
+    ['bank.com', 'https://bank.com/', true],
+    ['localhost:5555', 'http://localhost:5555/login', true],
+    ['192.168.1.1', 'http://192.168.1.1/', true],
+    ['https://192.168.1.1', 'http://192.168.1.1/', false],
     // non-web pages never match
     ['https://github.com', 'file:///C:/github.com.html', false],
     ['https://github.com', 'chrome://settings', false],

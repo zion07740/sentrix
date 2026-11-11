@@ -105,12 +105,13 @@ function renderPairing(code) {
 async function renderMatches() {
   const tab = await activeTab()
   const url = tab?.url ?? ''
+  const isWeb = /^https?:/.test(url)
   let host = ''
   try {
-    host = new URL(url).hostname
+    if (isWeb) host = new URL(url).hostname
   } catch {}
   main.replaceChildren(h('p', 'muted small', host ? `Logins for ${host}` : 'Open a website to see its logins.'))
-  if (!/^https?:/.test(url)) return
+  if (!isWeb) return
   const r = await send({ type: 'tab-matches', url })
   if (!r.ok) return main.append(h('p', 'muted', `Could not load (${r.status}).`))
   if (!r.items.length) return main.append(h('p', 'muted', 'No saved logins for this site.'))

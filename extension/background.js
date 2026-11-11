@@ -236,7 +236,9 @@ async function fromPopup(msg) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id || !msg || typeof msg.type !== 'string') return false
-  const isPopup = !sender.tab && !!sender.url?.startsWith(chrome.runtime.getURL(''))
+  // Extension pages (the popup, even when opened in a tab) have our own chrome-extension:// URL;
+  // content scripts never run on extension pages, so they always report the web page's URL.
+  const isPopup = !!sender.url?.startsWith(chrome.runtime.getURL(''))
   const handler = isPopup ? fromPopup(msg) : fromContent(msg, sender)
   handler.then(sendResponse, (e) => sendResponse({ ok: false, status: 'error', message: String(e?.message ?? e) }))
   return true
