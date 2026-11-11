@@ -1,0 +1,43 @@
+appId: com.sentrix.app
+productName: Sentrix
+copyright: Copyright (c) 2026 Sentrix contributors
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+asar: true
+# The browser extension ships next to the app so users can "Load unpacked" it.
+extraResources:
+  - from: extension
+    to: extension
+# Electron fuses: switch off ways to run arbitrary code inside the app binary.
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+nsis:
+  artifactName: ${productName}-Setup-${version}.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Sentrix
+  # Never delete the user's vault on uninstall.
+  deleteAppDataOnUninstall: false
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+publish: null

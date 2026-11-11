@@ -1,0 +1,151 @@
+:root {
+  --bg: #0e1218;
+  --panel: #151a23;
+  --line: #242b3a;
+  --text: #e8ecf3;
+  --muted: #8892a5;
+  --accent: #2fd3a3;
+  --danger: #ff6b6b;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  width: 340px;
+  background: var(--bg);
+  color: var(--text);
+  font: 13.5px/1.45 'Segoe UI', system-ui, sans-serif;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  font-weight: 700;
+  font-size: 15px;
+  flex: 1;
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #555;
+}
+.dot.ready {
+  background: var(--accent);
+}
+.dot.warn {
+  background: #ffb547;
+}
+.dot.err {
+  background: var(--danger);
+}
+main {
+  padding: 12px 14px;
+  min-height: 90px;
+}
+footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+h2 {
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+p {
+  margin: 6px 0;
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 12px;
+}
+button {
+  font: inherit;
+  cursor: pointer;
+}
+.btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  background: linear-gradient(135deg, #2fd3a3, #3fb0d0);
+  color: #04140f;
+}
+.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+  padding: 0;
+  font-size: 12.5px;
+}
+.link.danger {
+  color: var(--danger);
+}
+.code {
+  font: 600 32px/1.2 'Cascadia Mono', Consolas, monospace;
+  letter-spacing: 0.25em;
+  text-align: center;
+  padding: 12px 0;
+  margin: 8px 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--accent);
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--panel);
+  margin-bottom: 6px;
+}
+.item div {
+  flex: 1;
+  min-width: 0;
+}
+.item b,
+.item span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.item span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.chip {
+  border: 1px solid var(--line);
+  background: #1b2130;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.chip:hover {
+  border-color: var(--accent);
+}
+.gen {
+  font: 14px 'Cascadia Mono', Consolas, monospace;
+  word-break: break-all;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 8px;
+  user-select: all;
+}

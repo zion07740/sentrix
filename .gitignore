@@ -1,0 +1,11 @@
+node_modules/
+out/
+dist/
+release/
+build/bridge/
+*.log
+.DS_Store
+# never commit vaults or exports
+*.sentrix
+*.sentrix-export
+*.sentrix.bak
