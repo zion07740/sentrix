@@ -40,7 +40,10 @@ jobs:
       - name: Checksums
         shell: pwsh
         run: |
-          Get-ChildItem release -File -Include *.exe,*.zip | ForEach-Object {
+          # -Include only filters when the path ends in \*
+          $files = Get-ChildItem release/* -File -Include *.exe,*.zip
+          if (-not $files) { throw 'No release files found to checksum' }
+          $files | ForEach-Object {
             "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           } | Set-Content -Encoding utf8 release/SHA256SUMS.txt
           Get-Content release/SHA256SUMS.txt

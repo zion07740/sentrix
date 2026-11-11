@@ -10,7 +10,17 @@ import {
   type VaultData
 } from '@shared/types'
 import { type KdfParams, DEFAULT_KDF, wipe } from './crypto'
-import { FileKind, type KeyMaterial, WrongPasswordError, createKeyMaterial, openWithPassword, wrapKey, writeEncrypted } from './format'
+import {
+  FileKind,
+  type KeyMaterial,
+  WrongPasswordError,
+  createKeyMaterial,
+  openWithKey,
+  openWithPassword,
+  parseHeader,
+  wrapKey,
+  writeEncrypted
+} from './format'
 import { sanitizeEntry, sanitizeTombstone } from './entry'
 import { TOMBSTONE_TTL_MS, mergeVaults } from './merge'
 
@@ -126,6 +136,50 @@ export class VaultStore {
       }
       this.km = km
       this.purgeTombstones()
+      return true
+    } catch (e) {
+      if (e instanceof WrongPasswordError) return false
+      throw e
+    }
+  }
+
+  /**
+   * Unlock with the raw vault key (recovered through Windows Hello). Returns false if the key
+   * doesn't open this vault, e.g. the vault was replaced since Hello was set up.
+   */
+  unlockWithVaultKey(vaultKey: Buffer): boolean {
+    const file = readFileSync(this.path)
+    const h = parseHeader(file)
+    if (h.kind !== FileKind.Vault) return false
+    const km: KeyMaterial = { kind: h.kind, kdf: h.kdf, salt: h.salt, wrapNonce: h.wrapNonce, wrappedKey: h.wrappedKey, vaultKey: Buffer.from(vaultKey) }
+    let plaintext: Buffer
+    try {
+      plaintext = openWithKey(file, km)
+    } catch {
+      wipe(km.vaultKey)
+      return false
+    }
+    try {
+      this.data = parseVaultJson(plaintext)
+    } finally {
+      wipe(plaintext)
+    }
+    this.km = km
+    this.purgeTombstones()
+    return true
+  }
+
+  /** A copy of the vault key, for wrapping it with Windows Hello. The caller must wipe it. */
+  vaultKeyCopy(): Buffer {
+    if (!this.km) throw new Error('Vault is locked')
+    return Buffer.from(this.km.vaultKey)
+  }
+
+  /** Checks a master password against the vault file without changing anything. */
+  async verifyPassword(password: string): Promise<boolean> {
+    try {
+      const { km, plaintext } = await openWithPassword(readFileSync(this.path), FileKind.Vault, password)
+      wipe(km.vaultKey, plaintext)
       return true
     } catch (e) {
       if (e instanceof WrongPasswordError) return false

@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Entry, EntrySummary, EntryType } from '@shared/types'
+import type { Entry, EntrySummary, EntryType, HealthReport } from '@shared/types'
 import { Icon, Logo, type IconName } from '../components/Icon'
 import { Favicon } from '../components/ui'
 import { EntryEditor, EntryView } from './Entry'
 import { GeneratorPanel } from './Generator'
 import { SettingsScreen } from './Settings'
+import { HealthScreen } from './Health'
 
 const api = window.sentrix
 
 type Filter = 'all' | 'favorites' | 'login' | 'note' | 'trash'
-type View = 'items' | 'generator' | 'settings'
+type View = 'items' | 'generator' | 'settings' | 'health'
 
 const FILTERS: Array<{ id: Filter; label: string; icon: IconName }> = [
   { id: 'all', label: 'All items', icon: 'grid' },
@@ -27,9 +28,23 @@ export function VaultScreen({ onLock }: { onLock: () => void }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selected, setSelected] = useState<Entry | null>(null)
   const [editing, setEditing] = useState<{ type: EntryType; entry: Entry | null } | null>(null)
+  const [health, setHealth] = useState<HealthReport | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const load = useCallback(() => api.vault.list().then(setItems).catch(() => undefined), [])
+  const load = useCallback(() => {
+    api.vault.list().then(setItems).catch(() => undefined)
+    api.vault.health().then(setHealth).catch(() => undefined)
+  }, [])
+
+  const openEntry = (id: string) => {
+    setView('items')
+    setFilter('all')
+    setQuery('')
+    setEditing(null)
+    setSelectedId(id)
+  }
+
+  const healthProblems = health ? health.items.filter((i) => i.issues.some((x) => x === 'weak' || x === 'reused' || x === 'insecure')).length : 0
 
   useEffect(() => {
     load()
@@ -115,6 +130,11 @@ export function VaultScreen({ onLock }: { onLock: () => void }) {
             </button>
           ))}
           <div className="nav-sep" />
+          <button className={`nav-item${view === 'health' ? ' active' : ''}`} onClick={() => setView('health')}>
+            <Icon name="activity" size={17} />
+            <span>Password health</span>
+            {healthProblems > 0 && <span className="badge">{healthProblems}</span>}
+          </button>
           <button className={`nav-item${view === 'generator' ? ' active' : ''}`} onClick={() => setView('generator')}>
             <Icon name="wand" size={17} />
             <span>Generator</span>
@@ -134,6 +154,11 @@ export function VaultScreen({ onLock }: { onLock: () => void }) {
       {view === 'generator' && (
         <main className="page">
           <GeneratorPanel standalone />
+        </main>
+      )}
+      {view === 'health' && (
+        <main className="page">
+          <HealthScreen report={health} onOpen={openEntry} />
         </main>
       )}
       {view === 'settings' && (

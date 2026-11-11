@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { MergeStats, PairedBrowser, Settings } from '@shared/types'
+import type { HelloStatus, MergeStats, PairedBrowser, Settings } from '@shared/types'
 import { Icon } from '../components/Icon'
 import { Modal, PasswordInput, StrengthMeter, Toggle, useToast } from '../components/ui'
 
@@ -13,7 +13,9 @@ export function SettingsScreen() {
   const [browsers, setBrowsers] = useState<Array<Omit<PairedBrowser, 'key'>>>([])
   const [vaultPath, setVaultPath] = useState('')
   const [bridge, setBridge] = useState<{ running: boolean; error: string | null } | null>(null)
-  const [modal, setModal] = useState<null | 'password' | 'export' | { import: { token: string; name: string } }>(null)
+  const [modal, setModal] = useState<null | 'password' | 'export' | 'hello' | { import: { token: string; name: string } }>(null)
+  const [hello, setHello] = useState<HelloStatus | null>(null)
+  const loadHello = useCallback(() => api.hello.status().then(setHello), [])
   const toast = useToast()
 
   const loadBrowsers = useCallback(() => api.browser.list().then(setBrowsers), [])
@@ -22,8 +24,9 @@ export function SettingsScreen() {
     api.app.state().then((s) => setVaultPath(s.vaultPath))
     loadBrowsers()
     api.browser.status().then(setBridge)
+    loadHello()
     return api.on('vault-changed', loadBrowsers)
-  }, [loadBrowsers])
+  }, [loadBrowsers, loadHello])
 
   const update = async (patch: Partial<Settings>) => {
     setSettings(await api.settings.set(patch))
@@ -89,6 +92,32 @@ export function SettingsScreen() {
             ))}
             <option value={0}>Never</option>
           </select>
+        </div>
+        <div className="setting">
+          <div>
+            <strong>
+              <Icon name="fingerprint" size={15} /> Unlock with Windows Hello
+            </strong>
+            <p className="muted small">
+              {hello === null
+                ? 'Checking Windows Hello…'
+                : hello.supported || hello.enabled
+                  ? 'Use your PIN, fingerprint or face instead of typing the master password. The master password always works too.'
+                  : 'Windows Hello is not set up on this PC. Add a PIN in Windows Settings → Accounts → Sign-in options, then come back.'}
+            </p>
+          </div>
+          <Toggle
+            label="Unlock with Windows Hello"
+            hideLabel
+            checked={!!hello?.enabled}
+            disabled={!hello || (!hello.supported && !hello.enabled)}
+            onChange={async (v) => {
+              if (v) return setModal('hello')
+              await api.hello.disable()
+              await loadHello()
+              toast('Windows Hello unlock turned off', 'info')
+            }}
+          />
         </div>
         <div className="setting">
           <Toggle label="Lock when the window is minimized" checked={settings.lockOnMinimize} onChange={(v) => update({ lockOnMinimize: v })} />
@@ -203,8 +232,56 @@ export function SettingsScreen() {
 
       {modal === 'password' && <ChangePasswordModal onClose={() => setModal(null)} />}
       {modal === 'export' && <ExportModal onClose={() => setModal(null)} />}
+      {modal === 'hello' && (
+        <HelloModal
+          onClose={() => {
+            setModal(null)
+            loadHello()
+          }}
+        />
+      )}
       {modal && typeof modal === 'object' && <ImportModal file={modal.import} onClose={() => setModal(null)} />}
     </div>
+  )
+}
+
+function HelloModal({ onClose }: { onClose: () => void }) {
+  const [pw, setPw] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const toast = useToast()
+  const submit = async () => {
+    if (!pw || busy) return
+    setBusy(true)
+    setError('')
+    const res = await api.hello.enable(pw)
+    setBusy(false)
+    if (res.ok) {
+      toast('Windows Hello unlock is on')
+      onClose()
+    } else setError(res.error ?? 'Could not turn on Windows Hello')
+  }
+  return (
+    <Modal title="Turn on Windows Hello" onClose={busy ? undefined : onClose}>
+      <p className="muted small">
+        Confirm your master password. Windows will then ask for your PIN, fingerprint or face (twice, to check it works). Sentrix keeps a copy of your
+        vault key that only Windows Hello on this PC can unlock.
+      </p>
+      <label className="field">
+        <span>Master password</span>
+        <PasswordInput value={pw} onChange={setPw} autoFocus onEnter={submit} />
+      </label>
+      {busy && <p className="small">Follow the Windows Hello prompt…</p>}
+      {error && <div className="error">{error}</div>}
+      <div className="modal-actions">
+        <button className="btn ghost" onClick={onClose} disabled={busy}>
+          Cancel
+        </button>
+        <button className="btn primary" disabled={!pw || busy} onClick={submit}>
+          {busy ? 'Waiting for Windows Hello…' : 'Continue'}
+        </button>
+      </div>
+    </Modal>
   )
 }
 

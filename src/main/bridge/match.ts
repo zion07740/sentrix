@@ -62,3 +62,11 @@ export function originOf(pageUrl: string): string | null {
 export function hostOf(pageUrl: string): string {
   return parseUrl(pageUrl, true)?.hostname.replace(/^www\./, '') ?? ''
 }
+
+/** A saved URL that explicitly uses plain http:// for a public site (local addresses are fine). */
+export function isInsecureUrl(url: string): boolean {
+  const u = parseUrl(url, false)
+  if (!u || u.protocol !== 'http:') return false
+  const info = parse(u.hostname, { allowPrivateDomains: true })
+  return !info.isIp && !!info.domain
+}

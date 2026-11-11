@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Icon, type IconName } from './Icon'
-import { SCORE_LABEL, strength } from '../strength'
+import { SCORE_LABEL, strength } from '@shared/strength'
 
 // ---------------- toasts ----------------
 
@@ -144,14 +144,27 @@ export function Modal({ title, children, onClose, wide }: { title: string; child
   )
 }
 
-export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+export function Toggle({
+  checked,
+  onChange,
+  label,
+  disabled,
+  hideLabel
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  label: string
+  disabled?: boolean
+  /** the label is shown elsewhere; keep it for screen readers only */
+  hideLabel?: boolean
+}) {
   return (
-    <label className="toggle">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    <label className={`toggle${disabled ? ' disabled' : ''}`}>
+      <input type="checkbox" checked={checked} disabled={disabled} aria-label={label} onChange={(e) => onChange(e.target.checked)} />
       <span className="toggle-track">
         <span className="toggle-thumb" />
       </span>
-      <span>{label}</span>
+      {!hideLabel && <span>{label}</span>}
     </label>
   )
 }

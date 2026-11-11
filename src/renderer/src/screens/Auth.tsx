@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Logo } from '../components/Icon'
+import { Icon, Logo } from '../components/Icon'
 import { PasswordInput, StrengthMeter } from '../components/ui'
-import { strength } from '../strength'
+import { strength } from '@shared/strength'
 
 const api = window.sentrix
 
@@ -91,6 +91,25 @@ export function UnlockScreen({ onDone }: { onDone: () => void }) {
   }, [waitUntil])
 
   const waiting = Math.max(0, Math.ceil((waitUntil - now) / 1000))
+  const [helloOn, setHelloOn] = useState(false)
+  const [helloBusy, setHelloBusy] = useState(false)
+
+  useEffect(() => {
+    api.hello
+      .status()
+      .then((s) => setHelloOn(s.enabled))
+      .catch(() => undefined)
+  }, [])
+
+  const unlockWithHello = async () => {
+    if (helloBusy) return
+    setHelloBusy(true)
+    setError('')
+    const res = await api.vault.unlockWithHello()
+    setHelloBusy(false)
+    if (res.ok) onDone()
+    else setError(res.error ?? 'Windows Hello did not unlock Sentrix')
+  }
 
   const submit = async () => {
     if (!pw || busy || waiting) return
@@ -116,11 +135,19 @@ export function UnlockScreen({ onDone }: { onDone: () => void }) {
         <div className="auth-lock">
           <Logo size={56} />
           <h1>Sentrix is locked</h1>
-          <p className="muted">Enter your master password to unlock.</p>
+          <p className="muted">{helloOn ? 'Use Windows Hello or your master password.' : 'Enter your master password to unlock.'}</p>
         </div>
-        <PasswordInput value={pw} onChange={setPw} autoFocus placeholder="Master password" onEnter={submit} />
+        {helloOn && (
+          <>
+            <button className="btn primary block hello-btn" onClick={unlockWithHello} disabled={helloBusy}>
+              <Icon name="fingerprint" size={18} /> {helloBusy ? 'Waiting for Windows Hello…' : 'Unlock with Windows Hello'}
+            </button>
+            <div className="or">or</div>
+          </>
+        )}
+        <PasswordInput value={pw} onChange={setPw} autoFocus={!helloOn} placeholder="Master password" onEnter={submit} />
         {error && <div className="error">{error}{waiting ? ` Try again in ${waiting}s.` : ''}</div>}
-        <button className="btn primary block" disabled={!pw || busy || waiting > 0} onClick={submit}>
+        <button className={`btn block${helloOn ? "" : " primary"}`} disabled={!pw || busy || waiting > 0} onClick={submit}>
           {busy ? 'Unlocking…' : 'Unlock'}
         </button>
       </div>

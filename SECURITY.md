@@ -54,6 +54,24 @@ offset size  field
 - **What the extension can ask for:** the logins that match the current tab's URL (the URL comes from the browser, not from the page), one credential by ID *for that URL*, a "save/update this login" request for that URL, and a generated password. It can't list or read the rest of the vault.
 - Pairing keys live inside the encrypted vault. When the vault is locked, the app answers every request with `locked`. Paired browsers can be revoked in Settings.
 
+### Windows Hello unlock
+
+Windows Hello unlock is optional and off by default. Turning it on requires your master password.
+
+- Sentrix asks Windows Hello to create an RSA key named `Sentrix-<uuid>`. The private key stays inside Windows Hello (the TPM where available), and using it requires your PIN, fingerprint or face.
+- Sentrix signs a random 32-byte challenge with that key: `helloKey = HKDF-SHA256(signature, salt = challenge, "sentrix-hello-v1")`. During setup it signs twice and refuses to continue if the two signatures differ.
+- The vault key is wrapped with `helloKey` using AES-256-GCM (the AAD binds the key name and challenge). It is stored in `%APPDATA%\Sentrix\hello.sentrix`, which is also encrypted with Windows DPAPI (`safeStorage`), tying it to your Windows account.
+- Unlocking asks Windows Hello for the signature again, rebuilds `helloKey`, and unwraps the vault key. Without a Hello gesture the key can't be rebuilt.
+- After 5 failed Hello unlocks in a row, the master password is required.
+- Turning Hello off deletes both the file and the Windows Hello key. Changing the master password doesn't affect Hello, because the vault key stays the same.
+- Sentrix talks to Windows Hello through Windows PowerShell's built-in access to the Windows APIs. The script is passed on standard input, so there is no extra executable or script file on disk.
+
+**Limits:** Hello unlock stops someone at your keyboard who doesn't know your PIN or lacks your fingerprint. Like the rest of Sentrix, it can't defend against malware already running as your Windows user.
+
+### Password health
+
+The report is computed in the main process. Passwords are compared through their SHA-256 hashes, which are kept in memory only. Only entry IDs, titles and issue flags are sent to the UI. Nothing is sent over the network: there are no breach-database lookups.
+
 ## Application hardening
 
 - The renderer runs with `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false` and a strict CSP (`default-src 'self'; connect-src 'none'; …`). It never sees the vault key. All crypto and file I/O happen in the main process.

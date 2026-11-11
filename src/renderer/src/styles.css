@@ -1107,3 +1107,159 @@ input[type='range'] {
 .error-text {
   color: var(--danger);
 }
+
+/* ---------- password health ---------- */
+.health {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 28px 30px 48px;
+}
+.health-hero {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.health-hero p {
+  margin: 4px 0 0;
+}
+.score-ring circle {
+  fill: none;
+  stroke-width: 10;
+}
+.score-ring .ring-bg {
+  stroke: var(--line-2);
+}
+.score-ring .ring {
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s ease;
+}
+.score-ring.good .ring {
+  stroke: var(--accent);
+}
+.score-ring.fair .ring {
+  stroke: var(--warn);
+}
+.score-ring.bad .ring {
+  stroke: var(--danger);
+}
+.score-ring text {
+  fill: var(--text);
+  font: 700 26px var(--font);
+}
+.health-tiles {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.health-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text-2);
+  text-align: left;
+}
+.health-tile strong {
+  font-size: 22px;
+  color: var(--text);
+}
+.health-tile.has-issues strong,
+.health-tile.has-issues svg {
+  color: var(--danger);
+}
+.health-tile:hover {
+  border-color: var(--line-2);
+}
+.health-tile.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.health-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 6px;
+}
+.health-list .row {
+  gap: 12px;
+}
+.health-list .empty {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: flex-end;
+}
+.chip {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--panel-2);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.chip-weak,
+.chip-reused,
+.chip-insecure {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.chip-old {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn);
+}
+.go {
+  transform: rotate(180deg);
+  color: var(--muted);
+  flex: none;
+}
+.badge {
+  background: var(--danger);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 7px;
+  line-height: 18px;
+}
+.nav-item.active .badge {
+  color: #fff;
+}
+.toggle.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.setting strong svg {
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+.hello-btn {
+  margin-bottom: 4px;
+}
+.or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.or::before,
+.or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}

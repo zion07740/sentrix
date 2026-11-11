@@ -24,7 +24,14 @@ const api: SentrixApi = {
     restore: call('vault:restore'),
     deleteForever: call('vault:deleteForever'),
     emptyTrash: call('vault:emptyTrash'),
-    totp: call('vault:totp')
+    totp: call('vault:totp'),
+    health: call('vault:health'),
+    unlockWithHello: call('vault:unlockWithHello')
+  },
+  hello: {
+    status: call('hello:status'),
+    enable: call('hello:enable'),
+    disable: call('hello:disable')
   },
   clipboard: {
     copyField: call('clipboard:copyField'),

@@ -1,17 +1,23 @@
 import { randomBytes } from 'node:crypto'
 import { readFileSync, statSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { app, type BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent, shell } from 'electron'
-import type { CopyField, EntryInput, GeneratorOptions, PassphraseOptions, Settings, UnlockResult } from '@shared/types'
+import type { CopyField, EntryInput, GeneratorOptions, HelloStatus, PassphraseOptions, Settings, UnlockResult } from '@shared/types'
 import type { Session } from './session'
 import { applyInput, summarize } from './vault/entry'
 import { MIN_MASTER_LENGTH, VaultStore } from './vault/store'
 import { entriesFromCsv, entriesToCsv } from './vault/csv'
 import { generatePassphrase, generatePassword } from './generator'
 import { totpNow } from './totp'
+import { buildHealthReport } from './health'
 import type { BridgeServer } from './bridge/server'
 import { EXTENSION_ID } from './bridge/constants'
-import { CryptoError } from './vault/crypto'
+import { CryptoError, wipe } from './vault/crypto'
+import { deleteHelloBlob, helloEnroll, helloRemoveKey, helloSign, helloSupported, readHelloBlob, writeHelloBlob } from './hello'
+import { unwrapWithHello, wrapForHello } from './hello/blob'
+
+/** After this many failed Windows Hello unlocks in a row, the master password is required. */
+const MAX_HELLO_FAILURES = 5
 
 const MAX_IMPORT_BYTES = 50 * 1024 * 1024
 
@@ -24,6 +30,8 @@ export function registerIpc(opts: {
   const { session, bridge, isTrustedSender } = opts
   const store = session.store
   const importTokens = new Map<string, string>()
+  const dataDir = dirname(store.path)
+  let helloFailures = 0
 
   /** Wraps a handler: rejects calls from anything but our own UI and counts as user activity. */
   const handle = <A extends unknown[], R>(channel: string, fn: (...args: A) => R | Promise<R>, needsUnlock = true) => {
@@ -64,6 +72,7 @@ export function registerIpc(opts: {
         session.throttle.fail()
         return { ok: false, error: 'Wrong master password', retryInMs: session.throttle.check() }
       }
+      helloFailures = 0
       session.onUnlocked()
       return { ok: true }
     } catch (e) {
@@ -77,6 +86,10 @@ export function registerIpc(opts: {
       const pw = str(password, 1024)
       if (pw.length < MIN_MASTER_LENGTH) return { ok: false, error: `Use at least ${MIN_MASTER_LENGTH} characters` }
       return unlockLike(async () => {
+        // A Hello key from an older vault can't open the new one.
+        const stale = readHelloBlob(dataDir)
+        if (stale) await helloRemoveKey(stale.name)
+        deleteHelloBlob(dataDir)
         await store.create(pw)
         return true
       })
@@ -85,6 +98,81 @@ export function registerIpc(opts: {
   )
   handle('vault:unlock', (password: string) => unlockLike(() => store.unlock(str(password, 1024))), false)
   handle('vault:lock', () => session.lock(), false)
+
+  // ---------------- Windows Hello ----------------
+  const focusWindow = () => {
+    const win = opts.window()
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.show()
+      win.focus()
+    }
+  }
+
+  handle(
+    'hello:status',
+    async (): Promise<HelloStatus> => ({ supported: await helloSupported(), enabled: readHelloBlob(dataDir) !== null }),
+    false
+  )
+
+  handle('hello:enable', async (masterPassword: string) => {
+    if (!(await helloSupported())) return { ok: false, error: 'Windows Hello is not set up on this PC.' }
+    const wait = session.throttle.check()
+    if (wait > 0) return { ok: false, error: 'Too many attempts. Please wait.' }
+    if (!(await store.verifyPassword(str(masterPassword, 1024)))) {
+      session.throttle.fail()
+      return { ok: false, error: 'Wrong master password' }
+    }
+    focusWindow()
+    const r = await helloEnroll()
+    if (!r.ok) return { ok: false, error: r.error }
+    const vaultKey = store.vaultKeyCopy()
+    try {
+      const old = readHelloBlob(dataDir)
+      writeHelloBlob(dataDir, wrapForHello(vaultKey, r.signature, r.challenge, r.name))
+      if (old && old.name !== r.name) await helloRemoveKey(old.name)
+    } finally {
+      wipe(vaultKey, r.signature)
+    }
+    helloFailures = 0
+    return { ok: true }
+  })
+
+  handle('hello:disable', async () => {
+    const blob = readHelloBlob(dataDir)
+    deleteHelloBlob(dataDir)
+    if (blob) await helloRemoveKey(blob.name)
+  })
+
+  handle(
+    'vault:unlockWithHello',
+    async (): Promise<UnlockResult> => {
+      if (session.unlocked) return { ok: true }
+      const blob = readHelloBlob(dataDir)
+      if (!blob) return { ok: false, error: 'Windows Hello is not turned on for Sentrix.' }
+      if (helloFailures >= MAX_HELLO_FAILURES) return { ok: false, error: 'Too many Windows Hello attempts. Use your master password.' }
+      focusWindow()
+      const signed = await helloSign(blob)
+      if (!signed.ok) {
+        if (!signed.canceled) helloFailures++
+        return { ok: false, error: signed.error }
+      }
+      let vaultKey: Buffer | null = null
+      try {
+        vaultKey = unwrapWithHello(blob, signed.signature)
+        if (!store.unlockWithVaultKey(vaultKey)) throw new Error('mismatch')
+      } catch {
+        helloFailures++
+        return { ok: false, error: 'Windows Hello could not unlock this vault. Use your master password, then turn Hello off and on again.' }
+      } finally {
+        wipe(vaultKey, signed.signature)
+      }
+      helloFailures = 0
+      session.onUnlocked()
+      return { ok: true }
+    },
+    false
+  )
   handle('vault:changePassword', async (current: string, next: string): Promise<UnlockResult> => {
     const wait = session.throttle.check()
     if (wait > 0) return { ok: false, error: 'Too many attempts. Please wait.', retryInMs: wait }
@@ -140,6 +228,8 @@ export function registerIpc(opts: {
     const e = findEntry(str(id, 64))
     return e?.totp ? totpNow(e.totp) : null
   })
+
+  handle('vault:health', () => buildHealthReport(store.vault.entries))
 
   // ---------------- clipboard ----------------
   handle('clipboard:copyField', async (id: string, field: CopyField) => {

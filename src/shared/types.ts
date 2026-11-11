@@ -139,6 +139,42 @@ export interface PairRequest {
 
 export type CopyField = 'username' | 'password' | 'totp'
 
+// ---------------- password health ----------------
+
+export type HealthIssue = 'weak' | 'reused' | 'old' | 'insecure' | 'no2fa'
+
+export interface HealthItem {
+  id: string
+  title: string
+  username: string
+  host: string
+  issues: HealthIssue[]
+  /** zxcvbn score 0–4 */
+  strength: number
+  /** how many other logins use the same password */
+  reusedCount: number
+  /** days since the password was last changed */
+  ageDays: number
+}
+
+export interface HealthReport {
+  /** 0–100: share of logins without weak / reused / insecure problems */
+  score: number
+  total: number
+  counts: Record<HealthIssue, number>
+  /** only logins with at least one issue */
+  items: HealthItem[]
+}
+
+// ---------------- Windows Hello ----------------
+
+export interface HelloStatus {
+  /** Windows Hello is set up on this PC */
+  supported: boolean
+  /** Sentrix has a Hello key for this vault */
+  enabled: boolean
+}
+
 /** API exposed on window.sentrix by the preload script. */
 export interface SentrixApi {
   app: {
@@ -159,6 +195,13 @@ export interface SentrixApi {
     deleteForever(id: string): Promise<void>
     emptyTrash(): Promise<number>
     totp(id: string): Promise<TotpCode | null>
+    health(): Promise<HealthReport>
+    unlockWithHello(): Promise<UnlockResult>
+  }
+  hello: {
+    status(): Promise<HelloStatus>
+    enable(masterPassword: string): Promise<{ ok: boolean; error?: string }>
+    disable(): Promise<void>
   }
   clipboard: {
     copyField(id: string, field: CopyField): Promise<boolean>

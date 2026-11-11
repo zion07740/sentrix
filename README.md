@@ -17,6 +17,8 @@ No cloud. No accounts. No servers. Your passwords are encrypted and stay on your
 - **Move to another computer.** Export an encrypted file, copy it over (USB stick, message to yourself…), and import it. Items are **merged**, so you can sync two PCs back and forth.
 - **Import from other managers.** Reads CSV exports from Proton Pass, Chrome, Edge, Firefox, Bitwarden, LastPass and 1Password.
 - **Auto-lock.** Locks after inactivity and whenever Windows locks or sleeps. Copied passwords are cleared from the clipboard automatically.
+- **Password health.** Finds weak, reused and old passwords, logins saved for insecure `http://` sites, and logins without 2FA. Everything is checked on your PC.
+- **Windows Hello unlock.** Unlock with your PIN, fingerprint or face. Turn it on in Settings → Security. Your master password always works too.
 
 ## Download & install (Windows)
 
