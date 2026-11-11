@@ -317,7 +317,9 @@
       if (r?.ok && r.action !== 'none') showBanner({ action: r.action, host: r.host, username: username?.value || '' })
     })
   }
-  document.addEventListener('submit', (e) => capture(e.target), true)
+  // Only real user submissions: a page calling form.requestSubmit() itself must not be able to
+  // probe whether a guessed password matches the saved one (by watching for the prompt).
+  document.addEventListener('submit', (e) => e.isTrusted && capture(e.target), true)
   document.addEventListener(
     'click',
     (e) => {

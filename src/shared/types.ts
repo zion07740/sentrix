@@ -101,6 +101,7 @@ export interface AppState {
   vaultExists: boolean
   unlocked: boolean
   vaultPath: string
+  version: string
 }
 
 export interface UnlockResult {
@@ -108,6 +109,8 @@ export interface UnlockResult {
   error?: string
   /** ms the user must wait before trying again (brute-force throttle) */
   retryInMs?: number
+  /** something the user should know after a successful unlock (e.g. recovered from backup) */
+  notice?: string
 }
 
 export interface GeneratorOptions {

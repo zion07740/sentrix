@@ -119,6 +119,7 @@ export function UnlockScreen({ onDone }: { onDone: () => void }) {
     setBusy(false)
     if (res.ok) {
       setPw('')
+      if (res.notice) alert(res.notice)
       onDone()
       return
     }

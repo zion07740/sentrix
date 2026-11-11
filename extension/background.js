@@ -225,8 +225,8 @@ async function fromPopup(msg) {
       if (!/^https?:/i.test(url)) return { ok: true, items: [] }
       return request('matches', { url })
     }
-    case 'tab-credential':
-      return request('credential', { url: String(msg.url ?? ''), id: String(msg.id) })
+    case 'tab-copy':
+      return request('copy', { url: String(msg.url ?? ''), id: String(msg.id), field: msg.field === 'username' ? 'username' : 'password' })
     case 'generate':
       return request('generate')
     default:

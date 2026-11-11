@@ -1,5 +1,5 @@
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, copyFileSync, writeSync, unlinkSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import {
   DEFAULT_SETTINGS,
   type Entry,
@@ -62,11 +62,22 @@ export function parseExportJson(plaintext: Buffer): ExportData {
   } catch {
     throw new Error('Export file contents are not valid')
   }
+  // A timestamp in the future (wrong clock, or a crafted file) would win every later merge,
+  // so later edits could never replace it. Clamp anything beyond a day of skew to "now".
+  const now = Date.now()
+  const limit = now + 24 * 60 * 60 * 1000
+  const clamp = (t: number) => (t > limit ? now : t)
   return {
     version: 1,
     exportedAt: typeof raw.exportedAt === 'number' ? raw.exportedAt : 0,
-    entries: (Array.isArray(raw.entries) ? raw.entries : []).map((e) => sanitizeEntry(e)).filter((e): e is Entry => !!e),
-    tombstones: (Array.isArray(raw.tombstones) ? raw.tombstones : []).map(sanitizeTombstone).filter((t): t is Tombstone => !!t)
+    entries: (Array.isArray(raw.entries) ? raw.entries : [])
+      .map((e) => sanitizeEntry(e))
+      .filter((e): e is Entry => !!e)
+      .map((e) => ({ ...e, createdAt: clamp(e.createdAt), updatedAt: clamp(e.updatedAt), trashedAt: e.trashedAt === null ? null : clamp(e.trashedAt) })),
+    tombstones: (Array.isArray(raw.tombstones) ? raw.tombstones : [])
+      .map(sanitizeTombstone)
+      .filter((t): t is Tombstone => !!t)
+      .map((t) => ({ ...t, deletedAt: clamp(t.deletedAt) }))
   }
 }
 
@@ -124,23 +135,48 @@ export class VaultStore {
     this.save()
   }
 
+  /** Set after an unlock that had to fall back to the backup copy; shown to the user once. */
+  lastRecovery: string | null = null
+
   /** Returns false on a wrong password. */
   async unlock(password: string): Promise<boolean> {
-    const file = readFileSync(this.path)
+    this.lastRecovery = null
     try {
-      const { km, plaintext } = await openWithPassword(file, FileKind.Vault, password)
-      try {
-        this.data = parseVaultJson(plaintext)
-      } finally {
-        wipe(plaintext)
-      }
-      this.km = km
-      this.purgeTombstones()
+      const { km, plaintext } = await openWithPassword(readFileSync(this.path), FileKind.Vault, password)
+      this.load(km, plaintext)
       return true
     } catch (e) {
       if (e instanceof WrongPasswordError) return false
-      throw e
+      // The file is damaged (not a wrong password): try the previous copy with the same password.
+      // Never fall back on a wrong password: after a password change the .bak opens with the OLD
+      // password, and that would silently roll back the latest changes.
+      const bak = `${this.path}.bak`
+      if (!existsSync(bak)) throw e
+      let opened: Awaited<ReturnType<typeof openWithPassword>>
+      try {
+        opened = await openWithPassword(readFileSync(bak), FileKind.Vault, password)
+      } catch {
+        throw e
+      }
+      const damaged = `${this.path}.damaged-${Date.now()}`
+      renameSync(this.path, damaged)
+      this.load(opened.km, opened.plaintext)
+      this.save() // restore the main file from the backup
+      this.lastRecovery =
+        `Your vault file was damaged, so Sentrix opened the backup copy instead. ` +
+        `Changes from your most recent save may be missing. The damaged file was kept as ${basename(damaged)}.`
+      return true
     }
+  }
+
+  private load(km: KeyMaterial, plaintext: Buffer): void {
+    try {
+      this.data = parseVaultJson(plaintext)
+    } finally {
+      wipe(plaintext)
+    }
+    this.km = km
+    this.purgeTombstones()
   }
 
   /**

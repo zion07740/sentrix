@@ -20,17 +20,15 @@ async function activeTab() {
   return tab
 }
 
-async function copy(text, label) {
-  await navigator.clipboard.writeText(text)
-  const note = h('p', 'muted small', `${label} copied. It will be cleared in 30 seconds if unchanged.`)
-  main.append(note)
-  setTimeout(async () => {
-    try {
-      if ((await navigator.clipboard.readText()) === text) await navigator.clipboard.writeText('')
-    } catch {
-      /* popup closed */
-    }
-  }, 30_000)
+function note(text) {
+  main.append(h('p', 'muted small', text))
+}
+
+/** Copy through the Sentrix app: it clears the clipboard later and keeps it out of Windows clipboard history. */
+async function copyFromApp(url, id, field, label) {
+  const r = await send({ type: 'tab-copy', url, id, field })
+  if (!r?.ok) return note(`Could not copy (${r?.status ?? r?.error ?? 'error'}).`)
+  note(r.clearSeconds ? `${label} copied. Sentrix clears it in ${r.clearSeconds} seconds.` : `${label} copied.`)
 }
 
 async function render() {
@@ -121,14 +119,8 @@ async function renderMatches() {
     text.append(h('b', null, item.title || 'Login'), h('span', null, item.username || '(no username)'))
     const u = h('button', 'chip', 'User')
     const p = h('button', 'chip', 'Pass')
-    u.onclick = async () => {
-      const c = await send({ type: 'tab-credential', url, id: item.id })
-      if (c.ok) copy(c.username, 'Username')
-    }
-    p.onclick = async () => {
-      const c = await send({ type: 'tab-credential', url, id: item.id })
-      if (c.ok) copy(c.password, 'Password')
-    }
+    u.onclick = () => copyFromApp(url, item.id, 'username', 'Username')
+    p.onclick = () => copyFromApp(url, item.id, 'password', 'Password')
     row.append(text, u, p)
     main.append(row)
   }
@@ -140,7 +132,10 @@ document.getElementById('gen').onclick = async () => {
   if (!r.ok) return
   main.replaceChildren(h('h2', null, 'Generated password'), h('div', 'gen', r.password))
   const b = h('button', 'btn', 'Copy')
-  b.onclick = () => copy(r.password, 'Password')
+  b.onclick = async () => {
+    await navigator.clipboard.writeText(r.password)
+    note('Copied. Paste it, then save the login so it is not lost.')
+  }
   main.append(b)
 }
 

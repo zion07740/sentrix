@@ -12,6 +12,7 @@ export function SettingsScreen() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [browsers, setBrowsers] = useState<Array<Omit<PairedBrowser, 'key'>>>([])
   const [vaultPath, setVaultPath] = useState('')
+  const [version, setVersion] = useState('')
   const [bridge, setBridge] = useState<{ running: boolean; error: string | null } | null>(null)
   const [modal, setModal] = useState<null | 'password' | 'export' | 'hello' | { import: { token: string; name: string } }>(null)
   const [hello, setHello] = useState<HelloStatus | null>(null)
@@ -21,7 +22,10 @@ export function SettingsScreen() {
   const loadBrowsers = useCallback(() => api.browser.list().then(setBrowsers), [])
   useEffect(() => {
     api.settings.get().then(setSettings)
-    api.app.state().then((s) => setVaultPath(s.vaultPath))
+    api.app.state().then((s) => {
+      setVaultPath(s.vaultPath)
+      setVersion(s.version)
+    })
     loadBrowsers()
     api.browser.status().then(setBridge)
     loadHello()
@@ -228,6 +232,15 @@ export function SettingsScreen() {
         <p className="muted small">
           Vault file: <code>{vaultPath}</code>
         </p>
+        <div className="setting">
+          <div>
+            <strong>Sentrix {version}</strong>
+            <p className="muted small">Sentrix never checks for updates by itself. This opens the releases page in your browser.</p>
+          </div>
+          <button className="btn" onClick={() => api.app.openExternal('https://github.com/zion07740/sentrix/releases')}>
+            <Icon name="external" size={15} /> Check for updates
+          </button>
+        </div>
       </section>
 
       {modal === 'password' && <ChangePasswordModal onClose={() => setModal(null)} />}

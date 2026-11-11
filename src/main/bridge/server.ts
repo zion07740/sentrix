@@ -208,6 +208,15 @@ export class BridgeServer extends EventEmitter {
         if (!e) return { ok: false, error: 'not-found' }
         return { ok: true, username: e.username, password: e.password, totp: e.totp ? totpNow(e.totp)?.code ?? null : null }
       }
+      case 'copy': {
+        // Copied by the app, so it gets the auto-clear timer and stays out of clipboard history.
+        const e = this.loginsFor(url).find((x) => x.id === p.id)
+        if (!e) return { ok: false, error: 'not-found' }
+        const value = p.field === 'username' ? e.username : p.field === 'password' ? e.password : ''
+        if (!value) return { ok: false, error: 'empty' }
+        await this.session.copySecret(value)
+        return { ok: true, clearSeconds: this.session.settings.clipboardClearSeconds }
+      }
       case 'check-save': {
         const username = typeof p.username === 'string' ? p.username : ''
         const password = typeof p.password === 'string' ? p.password : ''

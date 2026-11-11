@@ -13,12 +13,14 @@ jobs:
   test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Fail on known high/critical vulnerabilities in anything that ships to users.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
       - run: npm test
 
@@ -27,10 +29,12 @@ jobs:
     needs: test
     runs-on: windows-latest
     permissions:
-      contents: write
+      contents: write # create the draft release
+      id-token: write # sign build provenance
+      attestations: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -47,8 +51,17 @@ jobs:
             "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
           } | Set-Content -Encoding utf8 release/SHA256SUMS.txt
           Get-Content release/SHA256SUMS.txt
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+      # Lets anyone verify a download was built here from this source:
+      #   gh attestation verify Sentrix-Setup-x.y.z.exe --repo zion07740/sentrix
+      - name: Build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            release/Sentrix-Setup-*.exe
+            release/Sentrix-*-portable.exe
+            release/Sentrix-extension-*.zip
+      - name: Publish GitHub release (draft)
+        uses: softprops/action-gh-release@v3
         with:
           draft: true
           generate_release_notes: true

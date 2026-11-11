@@ -12,6 +12,7 @@ import { totpNow } from './totp'
 import { buildHealthReport } from './health'
 import type { BridgeServer } from './bridge/server'
 import { EXTENSION_ID } from './bridge/constants'
+import { setBrowserDisabledOnDisk } from './bridge/flag'
 import { CryptoError, wipe } from './vault/crypto'
 import { deleteHelloBlob, helloEnroll, helloRemoveKey, helloSign, helloSupported, readHelloBlob, writeHelloBlob } from './hello'
 import { unwrapWithHello, wrapForHello } from './hello/blob'
@@ -51,7 +52,7 @@ export function registerIpc(opts: {
   const findEntry = (id: string) => store.vault.entries.find((e) => e.id === id)
 
   // ---------------- app ----------------
-  handle('app:state', () => ({ vaultExists: store.exists(), unlocked: session.unlocked, vaultPath: store.path }), false)
+  handle('app:state', () => ({ vaultExists: store.exists(), unlocked: session.unlocked, vaultPath: store.path, version: app.getVersion() }), false)
   handle('app:activity', () => undefined, false)
   handle(
     'app:openExternal',
@@ -74,7 +75,7 @@ export function registerIpc(opts: {
       }
       helloFailures = 0
       session.onUnlocked()
-      return { ok: true }
+      return store.lastRecovery ? { ok: true, notice: store.lastRecovery } : { ok: true }
     } catch (e) {
       return { ok: false, error: e instanceof CryptoError ? `Vault file problem: ${e.message}` : (e as Error).message }
     }
@@ -334,6 +335,7 @@ export function registerIpc(opts: {
     if (typeof patch?.lockOnMinimize === 'boolean') s.lockOnMinimize = patch.lockOnMinimize
     if (typeof patch?.browserIntegration === 'boolean' && patch.browserIntegration !== s.browserIntegration) {
       s.browserIntegration = patch.browserIntegration
+      setBrowserDisabledOnDisk(dataDir, !s.browserIntegration)
       if (s.browserIntegration) bridge.start()
       else bridge.stop()
     }

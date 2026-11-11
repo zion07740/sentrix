@@ -30,6 +30,10 @@ No cloud. No accounts. No servers. Your passwords are encrypted and stay on your
      ```powershell
      Get-FileHash .\Sentrix-Setup-x.y.z.exe -Algorithm SHA256
      ```
+   - Even stronger: every release is signed with GitHub build provenance. With the [GitHub CLI](https://cli.github.com) installed, this proves the file was built by this repository's workflow from this source code:
+     ```powershell
+     gh attestation verify .\Sentrix-Setup-x.y.z.exe --repo zion07740/sentrix
+     ```
    - Or [build it yourself](#build-from-source) from this source code.
 3. Create your **master password**. Pick something long that you'll remember, such as four or five random words.
 
@@ -83,7 +87,9 @@ How it stays safe:
 
 Full details and the threat model are in [SECURITY.md](SECURITY.md).
 
-**Where is my data?** `%APPDATA%\Sentrix\vault.sentrix`, plus a `vault.sentrix.bak` copy of the previous save. Back up that file whenever you like; it's useless without your master password.
+**Where is my data?** `%APPDATA%\Sentrix\vault.sentrix`, plus a `vault.sentrix.bak` copy of the previous save. Back up that file whenever you like; it's useless without your master password. If the vault file ever gets damaged (a disk error, say), Sentrix opens the backup copy automatically and tells you.
+
+**Something went wrong?** Errors are written to `%APPDATA%\Sentrix\logs\sentrix.log`. The log never contains passwords or vault contents, so it's safe to attach to a bug report.
 
 ## Build from source
 
@@ -129,7 +135,7 @@ tests/               unit tests (vitest)
 
 **My antivirus complains.** New, unsigned apps sometimes get flagged. Check the SHA-256 against the release page, or build from source.
 
-**Does Windows clipboard history keep copied passwords?** It can, if you've turned on clipboard history (Win + V). Sentrix clears the current clipboard after 30 seconds, but entries already saved in Windows clipboard history stay there. If that worries you, turn clipboard history off in Windows Settings → System → Clipboard.
+**Does Windows clipboard history keep copied passwords?** No. When Sentrix copies a password, it tells Windows to leave it out of clipboard history (Win + V) and cloud clipboard sync, and it clears the clipboard after 30 seconds. This also covers copies made from the browser extension's popup. Other programs you paste into can still see what you paste.
 
 **What happens if I uninstall?** Your vault file is kept in `%APPDATA%\Sentrix`. Delete that folder yourself if you want it gone.
 

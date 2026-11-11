@@ -1,9 +1,12 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, Menu, powerMonitor, session as electronSession, shell, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, dialog, Menu, powerMonitor, session as electronSession, shell, type IpcMainInvokeEvent } from 'electron'
 import { VaultStore } from './vault/store'
 import { Session } from './session'
 import { registerIpc } from './ipc'
 import { BridgeServer } from './bridge/server'
+import { browserDisabledOnDisk, setBrowserDisabledOnDisk } from './bridge/flag'
+import { initLog, logError } from './log'
+import { APP_ORIGIN, registerAppScheme, serveRenderer } from './app-protocol'
 
 const isDev = !app.isPackaged && !!process.env.ELECTRON_RENDERER_URL
 const devUrl = process.env.ELECTRON_RENDERER_URL ?? ''
@@ -22,6 +25,7 @@ if (app.isPackaged) {
   }
 }
 app.enableSandbox()
+registerAppScheme()
 app.commandLine.appendSwitch('disable-features', 'Autofill,AutofillServerCommunication,SpareRendererForSitePerProcess')
 app.setAppUserModelId('com.sentrix.app')
 
@@ -32,9 +36,26 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 let mainWindow: BrowserWindow | null = null
-const store = new VaultStore(app.getPath('userData'))
+const dataDir = app.getPath('userData')
+initLog(dataDir)
+const store = new VaultStore(dataDir)
 const session = new Session(store)
 const bridge = new BridgeServer(session, () => showWindow())
+
+// ---------------- crash handling ----------------
+// Anything unexpected: lock first (wipes keys and clipboard), log it, then tell the user.
+process.on('uncaughtException', (err) => {
+  try {
+    session.lock()
+  } catch {}
+  logError('main', err)
+  dialog.showErrorBox(
+    'Sentrix hit an unexpected error',
+    `Sentrix was locked to keep your vault safe and will now close. Your vault file is not affected.\n\nDetails were written to ${join(dataDir, 'logs', 'sentrix.log')}`
+  )
+  app.exit(1)
+})
+process.on('unhandledRejection', (reason) => logError('main-promise', reason))
 
 function showWindow(): void {
   if (!mainWindow) return
@@ -47,7 +68,7 @@ function showWindow(): void {
 function isTrustedSender(e: IpcMainInvokeEvent): boolean {
   const url = e.senderFrame?.url ?? ''
   if (!mainWindow || e.sender !== mainWindow.webContents) return false
-  return isDev ? url.startsWith(devUrl) : url.startsWith('file://')
+  return isDev ? url.startsWith(devUrl) : url.startsWith(`${APP_ORIGIN}/`)
 }
 
 function createWindow(): void {
@@ -80,9 +101,15 @@ function createWindow(): void {
     if (session.unlocked && session.settings.lockOnMinimize) session.lock()
   })
   mainWindow.on('closed', () => (mainWindow = null))
+  // If the UI process crashes, lock the vault and load a fresh UI.
+  mainWindow.webContents.on('render-process-gone', (_e, details) => {
+    logError('renderer', new Error(`UI process gone: ${details.reason} (exit ${details.exitCode})`))
+    session.lock()
+    if (details.reason !== 'clean-exit' && mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.reload()
+  })
 
   if (isDev) mainWindow.loadURL(devUrl)
-  else mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  else mainWindow.loadURL(`${APP_ORIGIN}/index.html`)
 }
 
 // Every web contents (incl. any we didn't expect): no navigation, no popups, no webviews.
@@ -101,11 +128,13 @@ app.on('web-contents-created', (_e, contents) => {
 app.whenReady().then(() => {
   if (!isDev) Menu.setApplicationMenu(null)
 
+  if (!isDev) serveRenderer(join(__dirname, '../renderer'))
+
   const ses = electronSession.defaultSession
   // No network: the UI may only load its own files (or the Vite dev server in development).
   ses.webRequest.onBeforeRequest((details, cb) => {
     const u = details.url
-    const allowed = u.startsWith('file://') || u.startsWith('devtools://') || u.startsWith('data:') || (isDev && (u.startsWith(devUrl) || u.startsWith(devUrl.replace(/^http/, 'ws'))))
+    const allowed = u.startsWith(`${APP_ORIGIN}/`) || u.startsWith('devtools://') || u.startsWith('data:') || (isDev && (u.startsWith(devUrl) || u.startsWith(devUrl.replace(/^http/, 'ws'))))
     if (!allowed) console.warn('[sentrix] blocked request:', u)
     cb({ cancel: !allowed })
   })
@@ -117,8 +146,12 @@ app.whenReady().then(() => {
 
   session.on('locked', () => mainWindow?.webContents.send('evt:locked'))
   session.on('vault-changed', () => mainWindow?.webContents.send('evt:vault-changed'))
+  // Keep the listener and the on-disk marker in line with the (encrypted) setting.
   session.on('unlocked', () => {
-    if (!session.settings.browserIntegration) bridge.stop()
+    const enabled = session.settings.browserIntegration
+    setBrowserDisabledOnDisk(dataDir, !enabled)
+    if (enabled) bridge.start()
+    else bridge.stop()
   })
   bridge.on('pair-request', (req) => mainWindow?.webContents.send('evt:pair-request', req))
 
@@ -129,7 +162,7 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  bridge.start()
+  if (!browserDisabledOnDisk(dataDir)) bridge.start()
 })
 
 app.on('second-instance', () => showWindow())

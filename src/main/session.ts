@@ -1,7 +1,33 @@
 import { EventEmitter } from 'node:events'
-import { clipboard } from 'electron'
+import { clipboard, ClipboardItem } from 'electron'
 import { DEFAULT_SETTINGS, type Settings } from '@shared/types'
 import { UnlockThrottle, VaultStore } from './vault/store'
+
+const osFormat = (name: string) => `electron application/osclipboard;format="${name}"`
+
+/**
+ * Copy a secret and ask Windows not to keep it: these formats stop it from being saved in
+ * clipboard history (Win+V), synced to the cloud clipboard, or recorded by clipboard monitors.
+ */
+async function writeSecretToClipboard(value: string): Promise<void> {
+  if (process.platform === 'win32') {
+    try {
+      const zeroDword = new Blob([new Uint8Array(4)])
+      await clipboard.write([
+        new ClipboardItem({
+          'text/plain': value,
+          [osFormat('ExcludeClipboardContentFromMonitorProcessing')]: new Blob([new Uint8Array(1)]),
+          [osFormat('CanIncludeInClipboardHistory')]: zeroDword,
+          [osFormat('CanUploadToCloudClipboard')]: zeroDword
+        })
+      ])
+      return
+    } catch (e) {
+      console.warn('[sentrix] clipboard privacy formats not supported, copying plain text:', (e as Error).message)
+    }
+  }
+  await clipboard.writeText(value)
+}
 
 /**
  * Holds the unlocked vault for the lifetime of the app and owns everything that
@@ -53,7 +79,7 @@ export class Session extends EventEmitter {
   }
 
   async copySecret(value: string): Promise<void> {
-    await clipboard.writeText(value)
+    await writeSecretToClipboard(value)
     this.clipboardValue = value
     if (this.clipboardTimer) clearTimeout(this.clipboardTimer)
     const secs = this.settings.clipboardClearSeconds

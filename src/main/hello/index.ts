@@ -21,10 +21,22 @@ interface HelloResult {
  * Runs the Windows Hello helper. The script goes to PowerShell on stdin (no script file on
  * disk, no execution-policy override); arguments go in environment variables.
  */
+/**
+ * Full path to Windows PowerShell. Never spawn it by bare name: Windows may look in the
+ * current/app folder first, so a planted powershell.exe (e.g. next to a portable exe in
+ * Downloads) could fake Hello signatures.
+ */
+export function powershellPath(): string {
+  const root = process.env.SystemRoot && /^[A-Za-z]:\\[^"<>|?*]*$/.test(process.env.SystemRoot) ? process.env.SystemRoot : 'C:\\Windows'
+  return join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+}
+
 function runHello(cmd: 'supported' | 'enroll' | 'sign' | 'remove', name = '', challenge = ''): Promise<HelloResult> {
   if (process.platform !== 'win32') return Promise.resolve({ ok: false, status: 'NotSupported' })
+  const exe = powershellPath()
+  if (!existsSync(exe)) return Promise.resolve({ ok: false, status: 'NotSupported', message: 'Windows PowerShell was not found.' })
   return new Promise((resolve) => {
-    const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', '-'], {
+    const ps = spawn(exe, ['-NoProfile', '-NonInteractive', '-Command', '-'], {
       windowsHide: true,
       env: { ...process.env, SENTRIX_HELLO_CMD: cmd, SENTRIX_HELLO_NAME: name, SENTRIX_HELLO_CHALLENGE: challenge }
     })

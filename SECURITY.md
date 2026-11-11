@@ -75,8 +75,23 @@ The report is computed in the main process. Passwords are compared through their
 ## Application hardening
 
 - The renderer runs with `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false` and a strict CSP (`default-src 'self'; connect-src 'none'; …`). It never sees the vault key. All crypto and file I/O happen in the main process.
-- Every IPC call is checked to come from the app's own window.
+- The UI is served from a private `app://sentrix/` scheme instead of `file://`. Requests that try to escape the UI folder are rejected (unit-tested against encoded `../` and `..\` tricks).
+- Every IPC call is checked to come from the app's own window at `app://sentrix/`.
 - All web requests except the app's own files are cancelled. Navigation, new windows, webviews, downloads and permission requests are all blocked.
-- Electron fuses are set: `RunAsNode` off, `NODE_OPTIONS` off, `--inspect` off, embedded ASAR integrity on, only-load-from-ASAR on. Release builds also refuse to start with `--remote-debugging-*` or `--inspect`.
-- On lock (manual, idle timeout, Windows lock/sleep/shutdown), the key buffers are overwritten and the decrypted data is dropped.
+- Electron fuses are set: `RunAsNode` off, `NODE_OPTIONS` off, `--inspect` off, embedded ASAR integrity on, only-load-from-ASAR on, extra `file://` privileges off. Release builds also refuse to start with `--remote-debugging-*` or `--inspect`.
+- Helper programs are launched by full path (`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe`), never by bare name. This means a planted `powershell.exe` next to the app can't be picked up.
+- Copied secrets carry Windows' `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory = 0` and `CanUploadToCloudClipboard = 0` formats, so they stay out of clipboard history and cloud sync. The clipboard is cleared after the configured time, but only if it still holds the copied value.
+- When "Browser autofill" is off, a non-secret marker file next to the vault makes sure the local listener isn't started, even before unlock.
+- The extension only checks "save this login?" for real user submissions (`isTrusted`). A page script can't submit forms itself to probe saved passwords.
+- Imported items with timestamps far in the future are clamped to the present, so a bad clock or a crafted file can't block later edits from winning merges.
+- On lock (manual, idle timeout, Windows lock/sleep/shutdown, an unexpected error, or a UI crash), the key buffers are overwritten and the decrypted data is dropped.
+- If the vault file is damaged, the previous copy is opened with the same password and the damaged file is kept aside. This never happens on a *wrong* password, because that could roll back to an older vault after a password change.
+- Errors go to `%APPDATA%\Sentrix\logs\sentrix.log` (error messages and stack traces only, no vault data).
+
+## Supply chain
+
+- Only a handful of runtime dependencies ship: `hash-wasm`, `otpauth`, `@zxcvbn-ts/*`, `tldts`, `ws`, `@scure/bip39`. CI fails the build if `npm audit` finds a high or critical issue in any of them.
+- Dependabot opens weekly update PRs for npm packages and GitHub Actions.
+- Releases are built on GitHub's runners, ship with `SHA256SUMS.txt`, and carry signed build provenance (`gh attestation verify <file> --repo zion07740/sentrix`).
+- The executables are not Authenticode-signed yet, so Windows SmartScreen warns on first run.
 - JavaScript strings, such as passwords shown in the UI, can't be reliably wiped from memory. This is a known limitation of Electron and of JS-based password managers in general.
