@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Sentrix",
   "short_name": "Sentrix",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Fill passwords from the Sentrix desktop app. Local only: talks to the app on this computer (127.0.0.1), never to the internet.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp65DRzLF0zTUh8TaxYyfgIFm0QLF5QQw7UhNQw5WpR7bO7+kdFErgPGKJ0vb5TRDXGvuIh3v4N33DtcJwdquWMZE8TVMpOzTYejjINdSgYGjK4MfAj3BlMWPCiNYdBBZc/krjU2EJ34i+QMY9Bvn8MnPz1LT2N8G6M+BFut6wEPjx3ny8sn5nPIGwY1WEPT4YyZOUqemnNveAJVrpuyHWDB6uvmpvKP6nKp/PAYQUEgyUMRcgo29Q0gO3TrEnJlr5i/+0kwPKqgaqlgVXEQLuwInH+bGOKcJFFQ/A4UaJX0r1D4p3N9Lczg8njicw+nugJWW2ieuJSVa6f4jzfER0QIDAQAB",
   "minimum_chrome_version": "116",
