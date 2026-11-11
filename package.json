@@ -1,7 +1,7 @@
 {
   "name": "sentrix",
   "productName": "Sentrix",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Sentrix: a local-only, encrypted password manager. No cloud, no accounts, no servers.",
   "license": "MIT",
   "author": "Sentrix contributors",
